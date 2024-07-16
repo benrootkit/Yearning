@@ -50,7 +50,7 @@ func (e *Confirm) GetTPL() []tpl.Tpl {
 
 func ExecuteOrder(u *Confirm, user string) common.Resp {
 	var order model.CoreSqlOrder
-	var source model.CoreDataSource
+
 	model.DB().Where("work_id =?", u.WorkId).First(&order)
 
 	if order.Status != 2 && order.Status != 5 {
@@ -58,36 +58,54 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 	}
 	order.Assigned = user
 
-	model.DB().Model(model.CoreDataSource{}).Where("source_id =?", order.SourceId).First(&source)
-	rule, err := lib.CheckDataSourceRule(source.RuleId)
-	if err != nil {
-		logger.DefaultLogger.Error(err)
+	/*查询ext_batch_source*/
+	var sourceList []model.ExtBatchSource
+	model.DB().Model(model.ExtBatchSource{}).Where("sql_orders_id =?", order.ID).Find(&sourceList)
+
+	var allSuccess = true
+	for _, batchSource := range sourceList {
+		var source model.CoreDataSource
+		model.DB().Model(model.CoreDataSource{}).Where("source_id =?", batchSource.SourceId).First(&source)
+		rule, err := lib.CheckDataSourceRule(source.RuleId)
+		if err != nil {
+			logger.DefaultLogger.Error(err)
+		}
+
+		batchSource.ExecResult = "mytest"
+		model.DB().Save(batchSource)
+
+		var isCall bool
+		if client := lib.NewRpc(); client != nil {
+			if err := client.Call("Engine.Exec", &ExecArgs{
+				Order:    &order,
+				Rules:    *rule,
+				IP:       source.IP,
+				Port:     source.Port,
+				Username: source.Username,
+				Password: lib.Decrypt(model.JWT, source.Password),
+				CA:       source.CAFile,
+				Cert:     source.Cert,
+				Key:      source.KeyFile,
+				Message:  model.GloMessage,
+			}, &isCall); err != nil {
+				allSuccess = false
+				batchSource.ExecResult = err.Error()
+				model.DB().Save(batchSource)
+			}
+		}
 	}
 
-	var isCall bool
-	if client := lib.NewRpc(); client != nil {
-		if err := client.Call("Engine.Exec", &ExecArgs{
-			Order:    &order,
-			Rules:    *rule,
-			IP:       source.IP,
-			Port:     source.Port,
-			Username: source.Username,
-			Password: lib.Decrypt(model.JWT, source.Password),
-			CA:       source.CAFile,
-			Cert:     source.Cert,
-			Key:      source.KeyFile,
-			Message:  model.GloMessage,
-		}, &isCall); err != nil {
-			return common.ERR_RPC
-		}
-		model.DB().Create(&model.CoreWorkflowDetail{
-			WorkId:   u.WorkId,
-			Username: user,
-			Time:     time.Now().Format("2006-01-02 15:04"),
-			Action:   i18n.DefaultLang.Load(i18n.ORDER_EXECUTE_STATE),
-		})
+	model.DB().Create(&model.CoreWorkflowDetail{
+		WorkId:   u.WorkId,
+		Username: user,
+		Time:     time.Now().Format("2006-01-02 15:04"),
+		Action:   i18n.DefaultLang.Load(i18n.ORDER_EXECUTE_STATE),
+	})
+
+	if allSuccess {
 		return common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.ORDER_EXECUTE_STATE))
 	}
+
 	return common.ERR_RPC
 
 }

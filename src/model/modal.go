@@ -218,3 +218,15 @@ type CoreTotalTickets struct {
 	TotalOrder int64  `gorm:"type:int(50);not null" json:"total_order"`
 	TotalQuery int64  `gorm:"type:int(50);not null" json:"total_query"`
 }
+
+type ExtBatchSource struct {
+	ID          uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	SqlOrdersId uint   `gorm:"type:int(50);not null" json:"sql_orders_id"`
+	Source      string `gorm:"type:varchar(50);not null" json:"source"`
+	SourceId    string `gorm:"type:varchar(200);not null;"  json:"source_id"`
+	ExecResult  string `gorm:"type:varchar(2000);not null;"  json:"exec_result"`
+}
+
+func (ExtBatchSource) TableName() string {
+	return "ext_batch_source"
+}

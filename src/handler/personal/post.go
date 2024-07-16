@@ -19,12 +19,23 @@ import (
 	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
+	"bytes"
 	"encoding/json"
 	"github.com/cookieY/yee"
+	"io"
 	"net/http"
 	"strings"
 	"time"
 )
+
+func contains(slice []string, item string) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
+}
 
 func Post(c yee.Context) (err error) {
 	switch c.Params("tp") {
@@ -37,6 +48,28 @@ func Post(c yee.Context) (err error) {
 }
 
 func sqlOrderPost(c yee.Context) (err error) {
+
+	body, err := io.ReadAll(c.Request().Body)
+	var requestBody map[string]interface{}
+	err = json.Unmarshal(body, &requestBody)
+	sourceIDList := requestBody["source_id_list"].([]interface{})
+	sourceList := requestBody["source_list"].([]interface{})
+	var sourceIDListStr []string
+	for _, sourceId := range sourceIDList {
+		if idStr, ok := sourceId.(string); ok {
+			sourceIDListStr = append(sourceIDListStr, idStr)
+		}
+	}
+
+	var sourceListStr []string
+	for _, source := range sourceList {
+		if idStr, ok := source.(string); ok {
+			sourceListStr = append(sourceListStr, idStr)
+		}
+	}
+
+	// 重新放到body里面
+	c.Request().Body = io.NopCloser(bytes.NewBuffer(body))
 
 	u := new(model.CoreSqlOrder)
 	user := new(lib.Token).JwtParse(c)
@@ -56,6 +89,22 @@ func sqlOrderPost(c yee.Context) (err error) {
 		Action:   i18n.DefaultLang.Load(i18n.INFO_SUBMITTED),
 		Time:     time.Now().Format("2006-01-02 15:04"),
 	})
+
+	/* create batch */
+	isHasSource := contains(sourceIDListStr, u.SourceId)
+	if !isHasSource {
+		sourceIDListStr = append(sourceIDListStr, u.SourceId)
+		sourceListStr = append(sourceListStr, u.Source)
+	}
+
+	for i, sourceId := range sourceIDListStr {
+		extBatch := new(model.ExtBatchSource)
+		extBatch.SqlOrdersId = u.ID
+		extBatch.SourceId = sourceId
+		extBatch.Source = sourceListStr[i]
+		model.DB().Create(extBatch)
+	}
+	/* end */
 
 	lib.MessagePush(u.WorkId, 2, "")
 
