@@ -99,7 +99,7 @@ func sqlOrderPost(c yee.Context) (err error) {
 
 	for i, sourceId := range sourceIDListStr {
 		extBatch := new(model.ExtBatchSource)
-		extBatch.SqlOrdersId = u.ID
+		extBatch.WorkId = u.WorkId
 		extBatch.SourceId = sourceId
 		extBatch.Source = sourceListStr[i]
 		model.DB().Create(extBatch)

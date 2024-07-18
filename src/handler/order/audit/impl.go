@@ -60,7 +60,7 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 
 	/*查询ext_batch_source*/
 	var sourceList []model.ExtBatchSource
-	model.DB().Model(model.ExtBatchSource{}).Where("sql_orders_id =?", order.ID).Find(&sourceList)
+	model.DB().Model(model.ExtBatchSource{}).Where("work_id =?", order.WorkId).Find(&sourceList)
 
 	var allSuccess = true
 	for _, batchSource := range sourceList {
@@ -70,9 +70,6 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 		if err != nil {
 			logger.DefaultLogger.Error(err)
 		}
-
-		batchSource.ExecResult = "mytest"
-		model.DB().Save(batchSource)
 
 		var isCall bool
 		if client := lib.NewRpc(); client != nil {

@@ -47,6 +47,8 @@ func FetchResourceForGet(y yee.Context) (err error) {
 		return fetch.FetchBoard(y)
 	case "comment":
 		return fetch.FetchOrderComment(y)
+	case "batch_source":
+		return fetch.FetchBatchSource(y)
 	}
 	return y.JSON(http.StatusOK, "Illegal")
 }
