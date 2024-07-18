@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/cookieY/yee/logger"
+	"net/rpc"
 	"strings"
 	"time"
 )
@@ -73,7 +74,15 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 
 		var isCall bool
 		if client := lib.NewRpc(); client != nil {
-			if err := client.Call("Engine.Exec", &ExecArgs{
+			model.DB().Create(&model.CoreSqlRecord{
+				WorkId:    u.WorkId,
+				SQL:       "----------------" + source.Source + "-------------",
+				State:     "",
+				Affectrow: 0,
+				Time:      "0ms",
+			})
+
+			err := CallSync(client, "Engine.Exec", &ExecArgs{
 				Order:    &order,
 				Rules:    *rule,
 				IP:       source.IP,
@@ -84,11 +93,12 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 				Cert:     source.Cert,
 				Key:      source.KeyFile,
 				Message:  model.GloMessage,
-			}, &isCall); err != nil {
+			}, &isCall)
+
+			if err != nil {
 				allSuccess = false
-				batchSource.ExecResult = err.Error()
-				model.DB().Save(batchSource)
 			}
+
 		}
 	}
 
@@ -105,6 +115,12 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 
 	return common.ERR_RPC
 
+}
+
+func CallSync(client *rpc.Client, serviceMethod string, args any, reply any) error {
+	doneChan := client.Go(serviceMethod, args, reply, make(chan *rpc.Call, 1)).Done
+	call := <-doneChan
+	return call.Error
 }
 
 func MultiAuditOrder(req *Confirm, user string) common.Resp {
