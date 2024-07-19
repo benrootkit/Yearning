@@ -20,8 +20,11 @@ import (
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"bytes"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"github.com/cookieY/yee"
+	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"strings"
@@ -97,12 +100,29 @@ func sqlOrderPost(c yee.Context) (err error) {
 		sourceListStr = append(sourceListStr, u.Source)
 	}
 
+	var workId = u.WorkId
 	for i, sourceId := range sourceIDListStr {
 		extBatch := new(model.ExtBatchSource)
 		extBatch.WorkId = u.WorkId
 		extBatch.SourceId = sourceId
 		extBatch.Source = sourceListStr[i]
 		model.DB().Create(extBatch)
+
+		/* 生成子工作流对象 */
+		subU := *u
+		/**重新生成work id**/
+		tmpUUID := uuid.New()
+		hash := md5.New()
+		hash.Write([]byte(tmpUUID.String()))
+		hashBytes := hash.Sum(nil)
+		hashString := hex.EncodeToString(hashBytes)
+		hashStringPrefix6 := hashString[:6]
+
+		subU.ID = 0
+		subU.WorkId = "0-" + workId + "-" + hashStringPrefix6
+		subU.Source = sourceListStr[i]
+		subU.SourceId = sourceId
+		model.DB().Create(&subU)
 	}
 	/* end */
 

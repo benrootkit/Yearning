@@ -50,3 +50,15 @@ type PermissionList struct {
 type Permission struct {
 	Permissions PermissionList `json:"permissions"`
 }
+
+type BatchSqlRecord struct {
+	ID        uint   `json:"id"`
+	WorkId    string `json:"work_id"`
+	Source    string `json:"source"`
+	SourceId  string `json:"source_id"`
+	SQL       string `json:"sql"`
+	State     string `json:"state"`
+	Affectrow uint   `json:"affect_row"`
+	Time      string `json:"time"`
+	Error     string `json:"error"`
+}

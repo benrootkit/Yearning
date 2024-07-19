@@ -102,6 +102,7 @@ func FetchAuditOrder(c yee.Context) (err error) {
 				}
 				user := token.Claims.(jwt.MapClaims)["name"].(string)
 				u.Paging().OrderBy("(status = 2) DESC, date DESC").Select(QueryField).Query(common.AccordingToAllOrderState(u.Expr.Status),
+					common.FilterWorkId(),
 					common.AccordingToAllOrderType(u.Expr.Type),
 					common.AccordingToRelevant(user),
 					common.AccordingToText(u.Expr.Text),

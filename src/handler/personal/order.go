@@ -45,6 +45,7 @@ func PersonalFetchMyOrder(c yee.Context) (err error) {
 				}
 				user := token.Claims.(jwt.MapClaims)["name"].(string)
 				u.Paging().Select(common.QueryField).Query(
+					common.FilterWorkId(),
 					common.AccordingToAllOrderType(u.Expr.Type),
 					common.AccordingToAllOrderState(u.Expr.Status),
 					common.AccordingToUsernameEqual(user),

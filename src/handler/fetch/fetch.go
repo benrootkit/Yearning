@@ -264,8 +264,30 @@ func FetchOrderDetailList(c yee.Context) (err error) {
 	var record []model.CoreSqlRecord
 	var count int64
 	start, end := lib.Paging(expr.Page, expr.PageSize)
-	model.DB().Model(&model.CoreSqlRecord{}).Where("work_id =?", expr.WorkId).Count(&count).Offset(start).Limit(end).Find(&record)
-	return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"record": record, "count": count}))
+	model.DB().Model(&model.CoreSqlRecord{}).Where("work_id like ?", "0-"+expr.WorkId+"%").Count(&count).Offset(start).Limit(end).Find(&record)
+	batchRecordList := covertToBatchRecord(record)
+	return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"record": batchRecordList, "count": count}))
+}
+
+func covertToBatchRecord(recordList []model.CoreSqlRecord) []model.BatchSqlRecord {
+	var batchRecordList []model.BatchSqlRecord
+	for _, record := range recordList {
+		var order model.CoreSqlOrder
+		model.DB().Model(&model.CoreSqlOrder{}).Where("work_id =?", record.WorkId).First(&order)
+
+		var batchSqlRecord model.BatchSqlRecord
+		batchSqlRecord.ID = record.ID
+		batchSqlRecord.WorkId = record.WorkId
+		batchSqlRecord.SQL = record.SQL
+		batchSqlRecord.Error = record.Error
+		batchSqlRecord.Affectrow = record.Affectrow
+		batchSqlRecord.State = record.State
+		batchSqlRecord.Time = record.Time
+		batchSqlRecord.Source = order.Source
+		batchSqlRecord.SourceId = order.SourceId
+		batchRecordList = append(batchRecordList, batchSqlRecord)
+	}
+	return batchRecordList
 }
 
 func FetchOrderDetailRollSQL(c yee.Context) (err error) {

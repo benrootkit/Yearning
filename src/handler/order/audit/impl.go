@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/cookieY/yee/logger"
-	"net/rpc"
 	"strings"
 	"time"
 )
@@ -60,13 +59,13 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 	order.Assigned = user
 
 	/*查询ext_batch_source*/
-	var sourceList []model.ExtBatchSource
-	model.DB().Model(model.ExtBatchSource{}).Where("work_id =?", order.WorkId).Find(&sourceList)
+	var subOrderList []model.CoreSqlOrder
+	model.DB().Model(model.CoreSqlOrder{}).Where("work_id like ?", "0-"+order.WorkId+"%").Find(&subOrderList)
 
 	var allSuccess = true
-	for _, batchSource := range sourceList {
+	for _, subOrder := range subOrderList {
 		var source model.CoreDataSource
-		model.DB().Model(model.CoreDataSource{}).Where("source_id =?", batchSource.SourceId).First(&source)
+		model.DB().Model(model.CoreDataSource{}).Where("source_id =?", subOrder.SourceId).First(&source)
 		rule, err := lib.CheckDataSourceRule(source.RuleId)
 		if err != nil {
 			logger.DefaultLogger.Error(err)
@@ -74,16 +73,8 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 
 		var isCall bool
 		if client := lib.NewRpc(); client != nil {
-			model.DB().Create(&model.CoreSqlRecord{
-				WorkId:    u.WorkId,
-				SQL:       "----------------" + source.Source + "-------------",
-				State:     "",
-				Affectrow: 0,
-				Time:      "0ms",
-			})
-
-			err := CallSync(client, "Engine.Exec", &ExecArgs{
-				Order:    &order,
+			err := client.Call("Engine.Exec", &ExecArgs{
+				Order:    &subOrder,
 				Rules:    *rule,
 				IP:       source.IP,
 				Port:     source.Port,
@@ -95,10 +86,14 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 				Message:  model.GloMessage,
 			}, &isCall)
 
+			for !isCall {
+				fmt.Println("waiting execute finish...")
+				time.Sleep(1 * time.Second)
+			}
+
 			if err != nil {
 				allSuccess = false
 			}
-
 		}
 	}
 
@@ -109,18 +104,15 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 		Action:   i18n.DefaultLang.Load(i18n.ORDER_EXECUTE_STATE),
 	})
 
+	// 设置主工作流完成
+	order.Status = 1
+
 	if allSuccess {
 		return common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.ORDER_EXECUTE_STATE))
 	}
 
 	return common.ERR_RPC
 
-}
-
-func CallSync(client *rpc.Client, serviceMethod string, args any, reply any) error {
-	doneChan := client.Go(serviceMethod, args, reply, make(chan *rpc.Call, 1)).Done
-	call := <-doneChan
-	return call.Error
 }
 
 func MultiAuditOrder(req *Confirm, user string) common.Resp {
