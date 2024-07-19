@@ -106,6 +106,8 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 
 	// 设置主工作流完成
 	order.Status = 1
+	order.ExecuteTime = time.Now().Format("2006-01-02 15:04")
+	model.DB().Updates(&order)
 
 	if allSuccess {
 		return common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.ORDER_EXECUTE_STATE))
