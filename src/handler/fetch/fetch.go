@@ -383,9 +383,10 @@ func FetchOrderComment(c yee.Context) (err error) {
 func FetchBatchSource(c yee.Context) (err error) {
 	workId := c.QueryParam("work_id")
 
-	var sourceList []model.ExtBatchSource
-	model.DB().Model(model.ExtBatchSource{}).Where("work_id =?", workId).Find(&sourceList)
-	return c.JSON(http.StatusOK, common.SuccessPayload(sourceList))
+	var subOrderList []model.CoreSqlOrder
+	model.DB().Model(model.CoreSqlOrder{}).Where("work_id like ?", "0-"+workId+"%").Find(&subOrderList)
+
+	return c.JSON(http.StatusOK, common.SuccessPayload(subOrderList))
 }
 
 func PostOrderComment(c yee.Context) (err error) {

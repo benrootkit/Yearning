@@ -102,11 +102,6 @@ func sqlOrderPost(c yee.Context) (err error) {
 
 	var workId = u.WorkId
 	for i, sourceId := range sourceIDListStr {
-		extBatch := new(model.ExtBatchSource)
-		extBatch.WorkId = u.WorkId
-		extBatch.SourceId = sourceId
-		extBatch.Source = sourceListStr[i]
-		model.DB().Create(extBatch)
 
 		/* 生成子工作流对象 */
 		subU := *u
